@@ -135,7 +135,7 @@ if (!window.__prefix___init) {
 ));
   if (waitingForInit) {
     read('#__prefix___init');
-    setTimeout(init, 1000);
+    setTimeout(init, 10);
   }
 }
 init();
