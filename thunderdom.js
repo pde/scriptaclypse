@@ -6,15 +6,17 @@ function setup() {
     alert('Please give this secret to the most alive-looking thing you see:\n' + objective);
 
     var player1 = new Worker("player1.js");
-    var player2 = new Worker("player2.js");
+    var player2 = new Worker("player3.js");
     player1.name = 'player1';
     player2.name = 'player2';
     attachHandler(player1, objective);
     attachHandler(player2, objective);
 }
 
+
 function attachHandler(player, objective) {
     player.debt = 0;
+    player.won = false;
     player.onmessage = function(e) {
         var cmd = e.data;
         console.log(player.name, 'sent', cmd);
@@ -39,9 +41,12 @@ function attachHandler(player, objective) {
                     node.appendChild(document.createElement(cmd.append.name));
                 }
             }
-            if (cmd.capture) {
+            if (cmd.capture && !player.won) {
                 if (cmd.capture.secret == objective) {
-                    alert(player.name, 'wins!');
+                    alert(player.name +' wins!');
+                    player.won = true;
+                } else {
+                    console.log("Failed to capture " + cmd.capture.secret + " != " + objective);
                 }
             }
             
